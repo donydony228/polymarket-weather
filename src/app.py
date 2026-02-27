@@ -195,6 +195,15 @@ def load_all_data() -> dict:
             row = cur.fetchone()
             last_run = dict(row) if row else {}
 
+            # 5. 近兩天的逐時實際觀測
+            cur.execute("""
+                SELECT location_key, obs_date, obs_hour, temp_f
+                FROM weather_actuals_hourly
+                WHERE obs_date >= CURRENT_DATE - INTERVAL '1 day'
+                ORDER BY location_key, obs_date, obs_hour
+            """)
+            actual_rows = [dict(r) for r in cur.fetchall()]
+
     finally:
         conn.close()
 
@@ -215,6 +224,32 @@ def load_all_data() -> dict:
                 "temp_f": r["temp_f"],
                 "source": "forecast",
             })
+
+    # 將實際觀測合併進 forecasts（同一 target_date 的 obs_date）
+    actuals_by_city: dict[str, list] = {}
+    for r in actual_rows:
+        key = r["location_key"]
+        if key not in actuals_by_city:
+            actuals_by_city[key] = []
+        if r["temp_f"] is not None:
+            actuals_by_city[key].append(r)
+
+    for key, fcast in forecasts.items():
+        target_date = fcast["target_date"]
+        actual_pts = [
+            {
+                "hour":   r["obs_hour"],
+                "time":   _hour_label(r["obs_hour"]),
+                "temp_f": r["temp_f"],
+                "source": "actual",
+            }
+            for r in actuals_by_city.get(key, [])
+            if r["obs_date"] == target_date
+        ]
+        # 實際資料優先，去掉 forecast 中重複的 hour
+        actual_hours = {p["hour"] for p in actual_pts}
+        forecast_pts = [p for p in fcast["merged"] if p["hour"] not in actual_hours]
+        fcast["merged"] = sorted(actual_pts + forecast_pts, key=lambda x: x["hour"])
 
     markets: dict[str, dict] = {}
     for r in market_rows:
@@ -532,14 +567,21 @@ def render_city(city: dict, fcast: dict, mkt: dict):
                 )
         st.divider()
 
-    # ── 逐時預報折線圖 ────────────────────────────────────────────────────────
-    st.subheader("逐時預報氣溫")
-    st.caption(f"WU 預報 {len(merged)} 筆　·　資料時間：{snap_str}")
+    # ── 逐時氣溫折線圖 ────────────────────────────────────────────────────────
+    actual_cnt   = sum(1 for d in merged if d["source"] == "actual")
+    forecast_cnt = sum(1 for d in merged if d["source"] == "forecast")
+    caption_parts = []
+    if actual_cnt:
+        caption_parts.append(f"實際觀測 {actual_cnt} 筆")
+    if forecast_cnt:
+        caption_parts.append(f"WU 預報 {forecast_cnt} 筆")
+    st.subheader("逐時氣溫")
+    st.caption("　·　".join(caption_parts) + f"　·　預報時間：{snap_str}")
     st.plotly_chart(make_chart(city, merged), width="stretch")
     st.divider()
 
     # ── 溫度統計 ──────────────────────────────────────────────────────────────
-    st.subheader("預報溫度統計")
+    st.subheader("溫度統計")
     col1, col2 = st.columns(2)
     with col1:
         st.metric("預報最高", disp_temp(all_max_f, celsius))
@@ -550,7 +592,8 @@ def render_city(city: dict, fcast: dict, mkt: dict):
         rows = []
         for d in merged:
             t = f_to_c(d["temp_f"]) if celsius else d["temp_f"]
-            rows.append({"時間": d["time"], f"溫度 ({unit})": round(t, 1), "來源": "預報"})
+            src_label = "實際觀測" if d["source"] == "actual" else "預報"
+            rows.append({"時間": d["time"], f"溫度 ({unit})": round(t, 1), "來源": src_label})
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
