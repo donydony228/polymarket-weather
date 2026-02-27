@@ -1,0 +1,103 @@
+[
+  {
+    "name": "Seattle, WA",
+    "location_key": "us/wa/seatac/KSEA",
+    "series_slug": "seattle-daily-weather",
+    "event_slug_city": "seattle",
+    "wu_station": "KSEA"
+  },
+  {
+    "name": "Chicago, IL",
+    "location_key": "us/il/chicago/KORD",
+    "series_slug": "chicago-daily-weather",
+    "event_slug_city": "chicago",
+    "wu_station": "KORD"
+  },
+  {
+    "name": "Incheon, KR",
+    "location_key": "kr/incheon/RKSI",
+    "series_slug": "seoul-daily-weather",
+    "event_slug_city": "seoul",
+    "wu_station": "RKSI",
+    "note": "Polymarket 使用 Seoul，但 WU 站號相同（RKSI）"
+  },
+  {
+    "name": "Toronto, ON",
+    "location_key": "ca/mississauga/CYYZ",
+    "series_slug": "toronto-daily-weather",
+    "event_slug_city": "toronto",
+    "wu_station": "CYYZ"
+  },
+  {
+    "name": "Sao Paulo, BR",
+    "location_key": "br/guarulhos/SBGR",
+    "series_slug": "sao-paulo-daily-weather",
+    "event_slug_city": "sao-paulo",
+    "wu_station": "SBGR"
+  },
+  {
+    "name": "Miami, FL",
+    "location_key": "us/fl/miami/KMIA",
+    "series_slug": "miami-daily-weather",
+    "event_slug_city": "miami",
+    "wu_station": "KMIA"
+  },
+  {
+    "name": "Atlanta, GA",
+    "location_key": "us/ga/atlanta/KATL",
+    "series_slug": "atlanta-daily-weather",
+    "event_slug_city": "atlanta",
+    "wu_station": "KATL"
+  },
+  {
+    "name": "Paris, FR",
+    "location_key": "fr/paris/LFPG",
+    "series_slug": "paris-daily-weather",
+    "event_slug_city": "paris",
+    "wu_station": "LFPG"
+  },
+  {
+    "name": "Ankata, TR",
+    "location_key": "tr/çubuk/LTAC",
+    "series_slug": "ankara-daily-weather",
+    "event_slug_city": "ankara",
+    "wu_station": "LTAC",
+    "note": "cities.json 拼為 Ankata，正確應為 Ankara"
+  },
+  {
+    "name": "Dallas, TX",
+    "location_key": "us/tx/dallas/KDAL",
+    "series_slug": "dallas-daily-weather",
+    "event_slug_city": "dallas",
+    "wu_station": "KDAL"
+  },
+  {
+    "name": "Buenos Aires, AR",
+    "location_key": "ar/ezeiza/SAEZ",
+    "series_slug": "buenos-aires-daily-weather",
+    "event_slug_city": "buenos-aires",
+    "wu_station": "SAEZ"
+  },
+  {
+    "name": "Wellington, NZ",
+    "location_key": "nz/wellington/NZWN",
+    "series_slug": "wellington-daily-weather",
+    "event_slug_city": "wellington",
+    "wu_station": "NZWN"
+  },
+  {
+    "name": "New York City, NY",
+    "location_key": "us/ny/new-york-city/KLGA",
+    "series_slug": "nyc-daily-weather",
+    "event_slug_city": "nyc",
+    "wu_station": "KLGA",
+    "note": "Polymarket 使用縮寫 NYC"
+  },
+  {
+    "name": "London, UK",
+    "location_key": "gb/london/EGLC",
+    "series_slug": "london-daily-weather",
+    "event_slug_city": "london",
+    "wu_station": "EGLC"
+  }
+]

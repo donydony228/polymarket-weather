@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Seattle, WA",
+    "location_key": "us/wa/seatac/KSEA",
+    "celsius": false
+  },
+  {
+    "name": "Chicago, IL",
+    "location_key": "us/il/chicago/KORD",
+    "celsius": false
+  },
+  {
+    "name": "Incheon, KR",
+    "location_key": "kr/incheon/RKSI",
+    "celsius": true
+  },
+  {
+    "name": "Toronto, ON",
+    "location_key": "ca/mississauga/CYYZ",
+    "celsius": true
+  },
+  {
+    "name": "Sao Paulo, BR",
+    "location_key": "br/guarulhos/SBGR",
+    "celsius": true
+  },
+  {
+    "name": "Miami, FL",
+    "location_key": "us/fl/miami/KMIA",
+    "celsius": false
+  },
+  {
+    "name": "Atlanta, GA",
+    "location_key": "us/ga/atlanta/KATL",
+    "celsius": false
+  },
+  {
+    "name": "Paris, FR",
+    "location_key": "fr/paris/LFPG",
+    "celsius": true
+  },
+  {
+    "name": "Ankata, TR",
+    "location_key": "tr/çubuk/LTAC",
+    "celsius": true
+  },
+  {
+    "name": "Dallas, TX",
+    "location_key": "us/tx/dallas/KDAL",
+    "celsius": false
+  },
+  {
+    "name": "Buenos Aires, AR",
+    "location_key": "ar/ezeiza/SAEZ",
+    "celsius": true
+  },
+  {
+    "name": "Wellington, NZ",
+    "location_key": "nz/wellington/NZWN",
+    "celsius": true
+  },
+  {
+    "name": "New York City, NY",
+    "location_key": "us/ny/new-york-city/KLGA",
+    "celsius": false
+  },
+  {
+    "name": "London, UK",
+    "location_key": "gb/london/EGLC",
+    "celsius": true
+  }
+]

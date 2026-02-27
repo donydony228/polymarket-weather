@@ -1,0 +1,26 @@
+# 環境變數（含資料庫密碼）
+.env
+
+# Python 虛擬環境
+venv/
+.venv/
+
+# 執行日誌
+logs/
+
+# Python 快取
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Playwright 瀏覽器（GitHub Actions 會另行安裝）
+# playwright 瀏覽器位於 ~/.cache/ms-playwright，不在專案目錄內
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
