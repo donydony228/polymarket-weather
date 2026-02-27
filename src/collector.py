@@ -26,6 +26,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 
+_PROJECT_ROOT = Path(__file__).parent.parent  # src/ -> project root
+
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
@@ -562,9 +564,9 @@ async def main(dry_run: bool = False):
         print("  ** DRY RUN — 不寫入資料庫 **")
     print(f"{'='*60}")
 
-    cities = json.loads(Path("cities.json").read_text(encoding="utf-8"))
+    cities = json.loads((_PROJECT_ROOT / "config" / "cities.json").read_text(encoding="utf-8"))
     poly_cities: dict[str, dict] = {}
-    poly_path = Path("polymarket_cities.json")
+    poly_path = _PROJECT_ROOT / "config" / "polymarket_cities.json"
     if poly_path.exists():
         for c in json.loads(poly_path.read_text(encoding="utf-8")):
             poly_cities[c["location_key"]] = c

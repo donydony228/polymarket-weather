@@ -30,4 +30,4 @@ jobs:
       - name: Run collector
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python collector.py
+        run: python src/collector.py

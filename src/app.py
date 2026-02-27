@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
+_PROJECT_ROOT = Path(__file__).parent.parent  # src/ -> project root
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -839,9 +841,9 @@ def main():
         f"　·　更新日期：{datetime.now().strftime('%Y/%m/%d %H:%M')}"
     )
 
-    cities_path = Path("cities.json")
+    cities_path = _PROJECT_ROOT / "config" / "cities.json"
     if not cities_path.exists():
-        st.error("找不到 `cities.json`，請確認檔案存在於同一目錄。")
+        st.error("找不到 `config/cities.json`，請確認檔案存在。")
         st.stop()
 
     cities_raw = cities_path.read_text(encoding="utf-8")
@@ -849,7 +851,7 @@ def main():
 
     # 載入 Polymarket 城市對應表
     poly_cities: dict[str, dict] = {}
-    poly_path = Path("polymarket_cities.json")
+    poly_path = _PROJECT_ROOT / "config" / "polymarket_cities.json"
     if poly_path.exists():
         for c in json.loads(poly_path.read_text(encoding="utf-8")):
             poly_cities[c["location_key"]] = c
@@ -873,7 +875,7 @@ def main():
             tz_str = f"UTC{offset:+g}" if isinstance(offset, (int, float)) else ""
             st.markdown(f"- {city['name']}　`{unit}`　`{tz_str}`")
         st.divider()
-        st.caption("修改 `cities.json` 即可增減城市或切換溫度單位")
+        st.caption("修改 `config/cities.json` 即可增減城市或切換溫度單位")
 
     # ── WU 爬取 ───────────────────────────────────────────────────────────────
     with st.spinner(
