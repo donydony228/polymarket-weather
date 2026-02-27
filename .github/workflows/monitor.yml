@@ -1,0 +1,62 @@
+name: DB Health Monitor
+
+on:
+  schedule:
+    - cron: '30 */2 * * *'  # 每 2 小時的 30 分執行（錯開 collector 的整點）
+  workflow_dispatch:          # 允許手動觸發測試
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write   # 允許開 Issue
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Ensure monitoring label exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create "monitoring" \
+            --color "d93f0b" \
+            --description "Automated monitoring alert" \
+            2>/dev/null || true
+
+      - name: Run health check
+        id: check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if ! python src/monitor.py > /tmp/report.txt 2>&1; then
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+          cat /tmp/report.txt
+
+      - name: Check for existing open monitoring issue
+        if: steps.check.outputs.has_issues == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COUNT=$(gh issue list --label "monitoring" --state open --json number --jq length)
+          echo "open_count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue
+        if: steps.check.outputs.has_issues == 'true' && steps.existing.outputs.open_count == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "⚠️ 資料收集異常 $(date -u '+%Y-%m-%d %H:%M UTC')" \
+            --body-file /tmp/report.txt \
+            --label "monitoring"
