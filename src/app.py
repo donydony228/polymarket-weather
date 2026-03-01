@@ -7,6 +7,7 @@ import os
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,22 +30,31 @@ if not DATABASE_URL:
 
 # ── 常數 ──────────────────────────────────────────────────────────────────────
 
-TIMEZONE_UTC_OFFSET: dict[str, float] = {
-    "nz/wellington/NZWN":        13,
-    "kr/incheon/RKSI":            9,
-    "tr/çubuk/LTAC":              3,
-    "fr/paris/LFPG":              1,
-    "gb/london/EGLC":             0,
-    "ar/ezeiza/SAEZ":            -3,
-    "br/guarulhos/SBGR":         -3,
-    "us/ny/new-york-city/KLGA":  -5,
-    "ca/mississauga/CYYZ":       -5,
-    "us/fl/miami/KMIA":          -5,
-    "us/ga/atlanta/KATL":        -5,
-    "us/tx/dallas/KDAL":         -6,
-    "us/il/chicago/KORD":        -6,
-    "us/wa/seatac/KSEA":         -8,
+CITY_TZINFO: dict[str, ZoneInfo] = {
+    "nz/wellington/NZWN":        ZoneInfo("Pacific/Auckland"),
+    "kr/incheon/RKSI":           ZoneInfo("Asia/Seoul"),
+    "tr/çubuk/LTAC":             ZoneInfo("Europe/Istanbul"),
+    "fr/paris/LFPG":             ZoneInfo("Europe/Paris"),
+    "gb/london/EGLC":            ZoneInfo("Europe/London"),
+    "ar/ezeiza/SAEZ":            ZoneInfo("America/Argentina/Buenos_Aires"),
+    "br/guarulhos/SBGR":         ZoneInfo("America/Sao_Paulo"),
+    "us/ny/new-york-city/KLGA":  ZoneInfo("America/New_York"),
+    "ca/mississauga/CYYZ":       ZoneInfo("America/Toronto"),
+    "us/fl/miami/KMIA":          ZoneInfo("America/New_York"),
+    "us/ga/atlanta/KATL":        ZoneInfo("America/New_York"),
+    "us/tx/dallas/KDAL":         ZoneInfo("America/Chicago"),
+    "us/il/chicago/KORD":        ZoneInfo("America/Chicago"),
+    "us/wa/seatac/KSEA":         ZoneInfo("America/Los_Angeles"),
 }
+
+
+def _utc_offset_str(location_key: str) -> str:
+    """回傳當前的 UTC offset 字串，如 'UTC-5' 或 'UTC+2'。自動處理 DST。"""
+    tz = CITY_TZINFO.get(location_key)
+    if not tz:
+        return ""
+    offset_h = datetime.now(tz).utcoffset().total_seconds() / 3600
+    return f"UTC{offset_h:+g}"
 
 CITY_COORDS: dict[str, tuple[float, float]] = {
     "us/wa/seatac/KSEA":        (47.45,  -122.31),
@@ -88,7 +98,8 @@ def disp_temp(val_f: float | None, celsius: bool) -> str:
 def sort_by_timezone(cities: list[dict]) -> list[tuple[int, dict]]:
     def tz_key(item):
         _, city = item
-        offset = TIMEZONE_UTC_OFFSET.get(city["location_key"], 0)
+        tz = CITY_TZINFO.get(city["location_key"])
+        offset = datetime.now(tz).utcoffset().total_seconds() / 3600 if tz else 0
         return (-offset, city["name"])
     return sorted(enumerate(cities), key=tz_key)
 
@@ -466,8 +477,7 @@ def render_overview(cities: list[dict], sorted_pairs: list, forecasts: dict, mar
         for col, (_, city) in zip(cols, row):
             key      = city["location_key"]
             celsius  = city.get("celsius", False)
-            offset   = TIMEZONE_UTC_OFFSET.get(key, "?")
-            tz_label = f"UTC{offset:+g}" if isinstance(offset, (int, float)) else ""
+            tz_label = _utc_offset_str(key)
 
             merged   = forecasts.get(key, {}).get("merged", [])
             mkt_list = markets.get(key, {}).get("markets", [])
@@ -645,8 +655,7 @@ def main():
         st.markdown("**城市列表（依時區）**")
         for _, city in sort_by_timezone(cities):
             unit   = "°C" if city.get("celsius") else "°F"
-            offset = TIMEZONE_UTC_OFFSET.get(city["location_key"], "?")
-            tz_str = f"UTC{offset:+g}" if isinstance(offset, (int, float)) else ""
+            tz_str = _utc_offset_str(city["location_key"])
             st.markdown(f"- {city['name']}　`{unit}`　`{tz_str}`")
 
     # ── 分頁 ──────────────────────────────────────────────────────────────────

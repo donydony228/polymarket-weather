@@ -21,6 +21,13 @@ __pycache__/
 # macOS
 .DS_Store
 
+# Migration
+migrations/
+
 # IDE
 .vscode/
 .idea/
+analysis/output/
+
+# DOC
+docs/

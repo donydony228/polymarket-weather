@@ -25,6 +25,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 _PROJECT_ROOT = Path(__file__).parent.parent  # src/ -> project root
 
@@ -53,21 +54,21 @@ API_HEADERS  = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
 COLLECTION_WINDOW_HOURS = 36   # 距城市當日結束幾小時前開始收集
 
-TIMEZONE_UTC_OFFSET: dict[str, float] = {
-    "nz/wellington/NZWN":        13,
-    "kr/incheon/RKSI":            9,
-    "tr/çubuk/LTAC":              3,
-    "fr/paris/LFPG":              1,
-    "gb/london/EGLC":             0,
-    "ar/ezeiza/SAEZ":            -3,
-    "br/guarulhos/SBGR":         -3,
-    "us/ny/new-york-city/KLGA":  -5,
-    "ca/mississauga/CYYZ":       -5,
-    "us/fl/miami/KMIA":          -5,
-    "us/ga/atlanta/KATL":        -5,
-    "us/tx/dallas/KDAL":         -6,
-    "us/il/chicago/KORD":        -6,
-    "us/wa/seatac/KSEA":         -8,
+CITY_TZINFO: dict[str, ZoneInfo] = {
+    "nz/wellington/NZWN":        ZoneInfo("Pacific/Auckland"),
+    "kr/incheon/RKSI":           ZoneInfo("Asia/Seoul"),
+    "tr/çubuk/LTAC":             ZoneInfo("Europe/Istanbul"),
+    "fr/paris/LFPG":             ZoneInfo("Europe/Paris"),
+    "gb/london/EGLC":            ZoneInfo("Europe/London"),
+    "ar/ezeiza/SAEZ":            ZoneInfo("America/Argentina/Buenos_Aires"),
+    "br/guarulhos/SBGR":         ZoneInfo("America/Sao_Paulo"),
+    "us/ny/new-york-city/KLGA":  ZoneInfo("America/New_York"),
+    "ca/mississauga/CYYZ":       ZoneInfo("America/Toronto"),
+    "us/fl/miami/KMIA":          ZoneInfo("America/New_York"),
+    "us/ga/atlanta/KATL":        ZoneInfo("America/New_York"),
+    "us/tx/dallas/KDAL":         ZoneInfo("America/Chicago"),
+    "us/il/chicago/KORD":        ZoneInfo("America/Chicago"),
+    "us/wa/seatac/KSEA":         ZoneInfo("America/Los_Angeles"),
 }
 
 
@@ -94,9 +95,9 @@ def http_get(url: str) -> dict | list:
 
 # ── 城市時區工具 ──────────────────────────────────────────────────────────────
 
-def city_tz(location_key: str) -> timezone:
-    offset = TIMEZONE_UTC_OFFSET.get(location_key, 0)
-    return timezone(timedelta(hours=offset))
+def city_tz(location_key: str) -> ZoneInfo:
+    """回傳城市的 IANA 時區（自動處理 DST）。"""
+    return CITY_TZINFO.get(location_key, ZoneInfo("UTC"))
 
 
 def city_local_date(location_key: str) -> date:
@@ -166,10 +167,18 @@ def parse_history_full(html: str) -> list[dict]:
     return results
 
 
-def parse_forecast_full(html: str) -> list[dict]:
-    """解析 WU 預報頁全欄位"""
+def parse_forecast_full(html: str, current_local_hour: int | None = None) -> list[dict]:
+    """解析 WU 預報頁全欄位。
+
+    current_local_hour: 城市目前的本地小時（0–23）。
+        傳入後會在偵測到跨午夜（小時數折回）時截斷，
+        確保只回傳 target_date 當天剩餘的小時，不含隔天。
+        未傳入則回傳全部列（向下相容）。
+    """
     headers, rows = parse_mat_table(html)
-    results = []
+    results  = []
+    prev_hour = None  # 上一列的小時數，用於偵測跨日
+
     for row in rows:
         if len(row) < len(headers):
             continue
@@ -178,6 +187,14 @@ def parse_forecast_full(html: str) -> list[dict]:
         temp = extract_temp_f(_col(e, "Temp.", "Temperature"))
         if hour is None or temp is None:
             continue
+
+        # ── 跨日偵測：WU 頁面按時間順序排列，小時數只有跨午夜才會折回 ──
+        if current_local_hour is not None and prev_hour is not None:
+            if hour < prev_hour:
+                # 小時數折回 = 進入隔天，截斷並停止
+                break
+
+        prev_hour = hour
         results.append({
             "hour":            hour,
             "time":            _col(e, "Time"),
@@ -281,12 +298,13 @@ def upsert_forecast(conn, location_key: str, target_date: date,
         cur.execute("""
             INSERT INTO forecast_snapshots
                 (location_key, target_date, snapshot_time, hours_before_close,
-                 forecast_high_f, forecast_low_f, forecast_precip_pct)
-            VALUES (%s,%s,%s,%s, %s,%s,%s)
+                 forecast_high_f, forecast_low_f, n_forecast_hours,
+                 forecast_precip_pct)
+            VALUES (%s,%s,%s,%s, %s,%s,%s, %s)
             ON CONFLICT (location_key, target_date, snapshot_time) DO NOTHING
         """, (
             location_key, target_date, snapshot_time, hours_before,
-            max(temps), min(temps),
+            max(temps), min(temps), len(temps),
             avg([r.get("precip_pct") for r in forecast_pts]),
         ))
 
@@ -369,7 +387,8 @@ def upsert_cities_table(conn, cities: list[dict], poly_map: dict[str, dict]):
             key      = c["location_key"]
             poly     = poly_map.get(key, {})
             station  = poly.get("wu_station") or key.split("/")[-1]
-            tz_off   = TIMEZONE_UTC_OFFSET.get(key, 0)
+            tz_info  = CITY_TZINFO.get(key)
+            tz_off   = datetime.now(tz_info).utcoffset().total_seconds() / 3600 if tz_info else 0
             cur.execute("""
                 INSERT INTO cities
                     (location_key, name, series_slug, event_slug_city,
@@ -396,7 +415,7 @@ def upsert_cities_table(conn, cities: list[dict], poly_map: dict[str, dict]):
 
 def try_upsert_resolution(conn, location_key: str, market_date: date,
                            event: dict, markets: list[dict]) -> bool:
-    """若市場已結算，寫入結算選項。回傳是否成功寫入。"""
+    """若市場已結算，寫入結算選項與官方最高溫。回傳是否成功寫入。"""
     if not event.get("closed"):
         return False
     resolved = next(
@@ -406,13 +425,30 @@ def try_upsert_resolution(conn, location_key: str, market_date: date,
     )
     if resolved is None:
         return False
+
+    # 從 weather_daily_summary 查官方最高溫（結算依據）
+    official_high = None
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT official_high_f FROM weather_daily_summary "
+            "WHERE location_key=%s AND obs_date=%s",
+            (location_key, market_date),
+        )
+        row = cur.fetchone()
+        if row:
+            official_high = row[0]
+
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO market_resolutions
-                (location_key, market_date, resolved_option, volume_total_usdc)
-            VALUES (%s,%s,%s,%s)
-            ON CONFLICT (location_key, market_date) DO NOTHING
-        """, (location_key, market_date, resolved, event.get("volume")))
+                (location_key, market_date, resolved_option,
+                 wu_official_high_f, volume_total_usdc)
+            VALUES (%s,%s,%s, %s,%s)
+            ON CONFLICT (location_key, market_date) DO UPDATE SET
+                wu_official_high_f = COALESCE(
+                    market_resolutions.wu_official_high_f, EXCLUDED.wu_official_high_f)
+        """, (location_key, market_date, resolved,
+              official_high, event.get("volume")))
     conn.commit()
     return True
 
@@ -474,10 +510,12 @@ async def collect_city(
     snapshot_t: datetime,
     dry_run:    bool,
 ) -> list[str]:
-    key         = city["location_key"]
-    target_date = city_local_date(key)
-    hours_left  = hours_before_eod(key, target_date)
-    logs        = []
+    key              = city["location_key"]
+    target_date      = city_local_date(key)
+    hours_left       = hours_before_eod(key, target_date)
+    local_now        = datetime.now(city_tz(key))
+    current_local_hr = local_now.hour
+    logs             = []
 
     # ── 窗口內：預報 + 市場賠率 ──────────────────────────────────────────────
     if 0 <= hours_left <= COLLECTION_WINDOW_HOURS:
@@ -485,7 +523,7 @@ async def collect_city(
         try:
             forecast_url = f"https://www.wunderground.com/hourly/{key}"
             html         = await fetch_page(browser, forecast_url)
-            pts          = parse_forecast_full(html)
+            pts          = parse_forecast_full(html, current_local_hour=current_local_hr)
             if dry_run:
                 logs.append(f"[DRY] forecast {len(pts)} pts")
             else:
@@ -537,7 +575,8 @@ async def collect_city(
                 need_actuals = cur.fetchone()[0] < 20  # < 20 筆視為不完整
 
         if need_actuals:
-            history_url = f"https://www.wunderground.com/history/daily/{key}"
+            date_str    = yesterday.strftime("%Y-%m-%d")
+            history_url = f"https://www.wunderground.com/history/daily/{key}/date/{date_str}"
             html        = await fetch_page(browser, history_url)
             actuals     = parse_history_full(html)
             if dry_run:

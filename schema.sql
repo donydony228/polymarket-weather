@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS forecast_snapshots (
     hours_before_close  REAL,               -- 距 target_date 23:59 還有幾小時（正數）
     forecast_high_f     REAL,
     forecast_low_f      REAL,
+    n_forecast_hours    SMALLINT,             -- 此快照包含幾個小時的預報（用於判斷代表性）
     forecast_precip_in  REAL,
     forecast_precip_pct REAL,
     scraped_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
