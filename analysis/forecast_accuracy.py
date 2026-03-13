@@ -54,7 +54,7 @@ def get_conn():
     )
 
 
-def load_daily_data() -> pd.DataFrame:
+def load_daily_data(since: str | None = None) -> pd.DataFrame:
     """
     forecast_snapshots.forecast_high_f  vs  weather_daily_summary.official_high_f
 
@@ -84,15 +84,16 @@ def load_daily_data() -> pd.DataFrame:
                 WHERE fs.forecast_high_f    IS NOT NULL
                   AND ds.official_high_f    IS NOT NULL
                   AND fs.hours_before_close IS NOT NULL
+                  AND (%s IS NULL OR fs.target_date >= %s::date)
                 ORDER BY fs.location_key, fs.target_date, fs.hours_before_close DESC
-            """)
+            """, (since, since))
             rows = [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
     return pd.DataFrame(rows)
 
 
-def load_hourly_data() -> pd.DataFrame:
+def load_hourly_data(since: str | None = None) -> pd.DataFrame:
     """
     forecast_hourly_snapshots.temp_f  vs  weather_actuals_hourly.temp_f
 
@@ -127,8 +128,9 @@ def load_hourly_data() -> pd.DataFrame:
                   AND fs.snapshot_time = fh.snapshot_time
                 WHERE fh.temp_f IS NOT NULL
                   AND wa.temp_f IS NOT NULL
+                  AND (%s IS NULL OR fh.target_date >= %s::date)
                 ORDER BY fh.location_key, fh.target_date, fh.snapshot_time, fh.forecast_hour
-            """)
+            """, (since, since))
             rows = [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
@@ -273,19 +275,21 @@ def main():
     parser.add_argument("--city",    "-c", help="過濾城市（模糊匹配 location_key 或城市名）")
     parser.add_argument("--csv",     action="store_true", help="同時輸出 CSV 至 analysis/output/")
     parser.add_argument("--hourly",  action="store_true", help="顯示逐時預報 vs 逐時實測誤差")
+    parser.add_argument("--since",   help="只分析此日期之後的資料（YYYY-MM-DD），預設 2026-03-01（修正前資料不可靠）")
     args = parser.parse_args()
 
     if not DATABASE_URL:
         print("❌ DATABASE_URL 未設定")
         sys.exit(1)
 
-    print("載入資料中...")
-    df_daily = load_daily_data()
+    since = args.since or "2026-03-01"  # 修正前資料不可靠
+    print(f"載入資料中（since={since}）...")
+    df_daily = load_daily_data(since=since)
     print(f"  daily snapshots:  {len(df_daily)} 筆")
 
     df_hourly = pd.DataFrame()
     if args.hourly or args.csv:
-        df_hourly = load_hourly_data()
+        df_hourly = load_hourly_data(since=since)
         print(f"  hourly snapshots: {len(df_hourly)} 筆")
 
     print_daily_summary(df_daily, city_filter=args.city)
