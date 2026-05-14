@@ -343,6 +343,8 @@ def build_today_features(df_hist, today_base, today_curves):
     last_hist = (df_hist.sort_values("target_date")
                  .groupby("location_key").last().reset_index())
 
+    # avg_pressure_inhg = most recent day's pressure → used as prev_pressure for today
+    # prev_pressure (shift-1 in hist) = two days ago → used only for pressure_delta
     prev = last_hist[["location_key", "fc_peak", "actual_high",
                        "avg_humidity_pct", "avg_dew_point_f", "avg_pressure_inhg",
                        "prev_pressure"]].rename(columns={
@@ -350,13 +352,13 @@ def build_today_features(df_hist, today_base, today_curves):
         "actual_high":        "prev_actual_high",
         "avg_humidity_pct":   "prev_humidity",
         "avg_dew_point_f":    "prev_dewpoint",
-        "avg_pressure_inhg":  "prev_pressure_cur",
-        "prev_pressure":      "prev_pressure_lag2",
+        "avg_pressure_inhg":  "prev_pressure",
+        "prev_pressure":      "_prev_p_d2",
     })
     df = df.merge(prev, on="location_key", how="left")
 
     df["prev_fc_error"]        = df["prev_actual_high"] - df["prev_fc_peak"]
-    df["pressure_delta"]       = df["prev_pressure_cur"] - df["prev_pressure_lag2"]
+    df["pressure_delta"]       = df["prev_pressure"] - df["_prev_p_d2"]
     df["fc_minus_prev_actual"] = df["fc_peak"] - df["prev_actual_high"]
     df["lead_hours"]           = df["hours_before_close"]
 
