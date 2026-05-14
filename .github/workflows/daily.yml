@@ -1,0 +1,32 @@
+name: Daily Betting Recommendation
+
+on:
+  schedule:
+    # 14:00 UTC = 9am EST / 6am PST — runs after morning collector has data
+    - cron: '0 14 * * *'
+  workflow_dispatch:   # allow manual trigger
+
+jobs:
+  recommend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements-daily.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-daily.txt
+
+      - name: Run daily recommendation
+        env:
+          DATABASE_URL:       ${{ secrets.DATABASE_URL }}
+          SLACK_WEBHOOK_URL:  ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python src/daily_recommendation.py
